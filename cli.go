@@ -20,9 +20,23 @@ var runCommand = cli.Command{
 			Name:  "it",
 			Usage: "enable tty",
 		},
+		cli.BoolFlag{
+			Name: "d",
+			Usage: "detach container",
+		},
 		cli.StringFlag{
 			Name:  "m",
 			Usage: "set limitation of memory",
 		},
+		cli.StringFlag{
+			Name:  "v",
+			Usage: "source:distribution",
+		},
 	},
+}
+
+var commitCommand = cli.Command{
+	Name:  "commit",
+	Usage: `create a image from a running container. commit "output file"`,
+	Action: command.Commit,
 }

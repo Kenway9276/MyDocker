@@ -1,20 +1,23 @@
 package layer
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 )
 
+
+
 func NewWorkSpace(rootDir string) string{
 	createReadOnlyLayer(rootDir)
-	// TODO while using the same image, the write directory can be same
 	createReadWriteLayer(rootDir)
 	return createMntPoint(rootDir)
 }
 
 func DeleteWorkSpace(rootDir string) {
+	fmt.Println("delete work space")
 	deleteMountPoint(rootDir)
 	deleteWriteLayer(rootDir)
 }
@@ -22,10 +25,7 @@ func DeleteWorkSpace(rootDir string) {
 func createReadOnlyLayer(rootDir string) {
 	if _, err := os.Stat(path.Join(rootDir, "buzybox")); err != nil {
 		if os.IsNotExist(err) {
-			_, err = exec.Command("cp", "-r", "/buzybox", rootDir).CombinedOutput()
-			if err != nil {
-				log.Fatal("cannot cp buzybox")
-			}
+			log.Fatal("cannot find buzybox")
 		}
 	}
 }
@@ -55,7 +55,9 @@ func createMntPoint(rootDir string) string {
 }
 
 func deleteMountPoint(rootDir string) {
-	cmd := exec.Command("unmount", path.Join(rootDir, "mnt"))
+	mntDir := path.Join(rootDir, "mnt")
+
+	cmd := exec.Command("umount", mntDir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -63,8 +65,17 @@ func deleteMountPoint(rootDir string) {
 		log.Fatal(err)
 	}
 
+	err = os.RemoveAll(mntDir)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func deleteWriteLayer(rootDir string) {
+	writeDir := path.Join(rootDir, "writeLayer")
 
+	err := os.RemoveAll(writeDir)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

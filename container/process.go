@@ -4,6 +4,7 @@ import (
 	"MyDocker/layer"
 	"MyDocker/resource"
 	_interface "MyDocker/resource/interface"
+	"MyDocker/volume"
 	"io"
 	"log"
 	"os"
@@ -12,22 +13,45 @@ import (
 	"syscall"
 )
 
-func RunParent(tty bool, cmdArray []string, config *_interface.Config) {
+var workDir = "/mydocker"
+var MntDir string
 
-	parent := newParentPrecess(tty, cmdArray)
+func RunParent(tty bool, cmdArray []string, config *_interface.Config, volumeCmd string) error{
+	MntDir = layer.NewWorkSpace(workDir) // workDir/mnt
+	if tty {
+		defer layer.DeleteWorkSpace(workDir)
+	}
+
+	if volumeCmd != ""{
+		if err := volume.MountVolume(MntDir, volumeCmd); err != nil {
+			return err
+		}
+		if tty {
+			defer volume.UmountVolume(MntDir)
+		}
+	}
+
+	parent, err := newParentPrecess(tty, cmdArray, MntDir)
+	if err != nil {
+		return err
+	}
 
 	if err := parent.Start(); err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return err
 	}
 
 	subsystemManager := resource.NewSubsystemManager("mydocker-cgroup")
 	subsystemManager.Set(*config)
 	subsystemManager.Apply(parent.Process.Pid)
 
-	parent.Wait()
+	if tty {
+		parent.Wait()
+	}
+	return nil
 }
 
-func newParentPrecess(tty bool, cmdArray []string) *exec.Cmd {
+func newParentPrecess(tty bool, cmdArray []string, workDir string) (*exec.Cmd, error) {
 	resCmd := exec.Command(`/proc/self/exe`, "init")
 
 	resCmd.SysProcAttr = &syscall.SysProcAttr{
@@ -47,8 +71,9 @@ func newParentPrecess(tty bool, cmdArray []string) *exec.Cmd {
 
 	writeCmdToPipe(cmdArray, writer)
 	resCmd.ExtraFiles = []*os.File{reader}
-	resCmd.Dir = layer.NewWorkSpace("/mydocker")
-	return resCmd
+	resCmd.Dir = workDir
+
+	return resCmd, nil
 }
 
 func writeCmdToPipe(cmdArray []string, writer *os.File) {
